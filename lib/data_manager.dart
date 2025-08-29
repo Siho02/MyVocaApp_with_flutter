@@ -1,0 +1,152 @@
+import 'dart:io'; 
+import 'dart:convert'; 
+import 'package:path_provider/path_provider.dart'; 
+import 'package:voca_app/models/word.dart'; 
+
+class DataManager {
+  Future<File> get _localFile async {
+    final directory = await getApplicationDocumentsDirectory();
+    return File('${directory.path}/app_data.json');
+  }
+
+  // --- 데이터를 읽어오는 함수 ---
+  Future<Map<String, dynamic>> readData() async {
+    try {
+      final file = await _localFile;
+      if (!await file.exists()) {
+        final initialData = {"decks": {}};
+        await writeData(initialData);
+        return initialData;
+      }
+      final contents = await file.readAsString();
+      if (contents.isEmpty) {
+        return {"decks": {}};
+      }
+      return json.decode(contents);
+    } catch (e) {
+      return {"decks": {}};
+    }
+  }
+
+  // --- 데이터를 쓰는(저장하는) 함수 ---
+  Future<File> writeData(Map<String, dynamic> data) async {
+    final file = await _localFile;
+    final jsonString = json.encode(data);
+    return file.writeAsString(jsonString);
+  }
+
+  // 덱 이름 목록 가져오기 함수
+  Future<List<String>> getDeckNames() async {
+    final allData = await readData();
+    final dynamic decksData = allData['decks'];
+    if (decksData is Map) {
+      final decksMap = Map<String, dynamic>.from(decksData);
+      return decksMap.keys.toList();
+    }
+    return [];
+  }
+
+  // 새로운 덱 생성
+  Future<void> createDeck(String deckName) async {
+    final allData = await readData();
+    if (!allData['decks'].containsKey(deckName)) {
+      allData['decks'][deckName] = {'words': []};
+      await writeData(allData);
+      print("새 덱 생성 완료: $deckName");
+    }
+  }
+
+  // 덱 삭제
+  Future<void> deleteDeck(String deckName) async {
+    final allData = await readData();
+    allData['decks'].remove(deckName);
+    await writeData(allData);
+    print("덱 삭제 완료: $deckName");
+  }
+
+  // 덱에 단어 추가
+  Future<void> addWordToDeck(String deckName, Map<String, dynamic> newWord) async {
+    final allData = await readData();
+    final deck = allData['decks'][deckName] ?? {'words': []};
+
+    // 새 단어에 기본 복습 통계를 반드시 추가합니다.
+    newWord['review_stats'] = {
+      "study_to_native": {
+        "correct_cnt": 0, "incorrect_cnt": 0, "last_reviewed": null,
+        "next_review": DateTime.now().toIso8601String(),
+      },
+      "native_to_study": {
+        "correct_cnt": 0, "incorrect_cnt": 0, "last_reviewed": null,
+        "next_review": DateTime.now().toIso8601String(),
+      }
+    };
+    
+    deck['words'].add(newWord);
+    allData['decks'][deckName] = deck;
+    await writeData(allData);
+    print("단어 저장 완료 (복습 정보 포함): $newWord");
+  }
+
+  // 덱에 저장된 단어 조회
+  Future<List<Word>> getWordsForDeck(String deckName) async {
+    final allData = await readData();
+    final deck = allData['decks'][deckName];
+
+    if (deck != null && deck['words'] != null) {
+      final wordList = deck['words'] as List;
+      return wordList.map((wordJson) => Word.fromJson(wordJson)).toList();
+    }
+    return [];
+  }
+
+  // 덱에 저장된 단어 삭제
+  Future<void> deleteWordFromDeck(String deckName, Word wordToDelete) async {
+    final allData = await readData();
+    final deck = allData['decks'][deckName];
+
+    if (deck != null && deck['words'] != null) {
+      final wordList = deck['words'] as List;
+      
+      // wordList에서 삭제할 단어와 'createdAt'(생성 시간)이 같은 항목을 찾아 제거합니다.
+      // 생성 시간으로 비교하면 똑같은 단어가 여러 개 있어도 정확히 원하는 것만 지울 수 있습니다.
+      wordList.removeWhere((wordJson) => wordJson['createdAt'] == wordToDelete.createdAt);
+      
+      await writeData(allData);
+      print("단어 삭제 완료: ${wordToDelete.word}");
+    }
+  }
+  
+  // 덱에 저장된 단어 수정하기
+  Future<void> updateWordInDeck(String deckName, Word oldWord, Map<String, dynamic> updatedWordData) async {
+    final allData = await readData();
+    final deck = allData['decks'][deckName];
+
+    if (deck != null && deck['words'] != null) {
+      final wordList = deck['words'] as List;
+      final index = wordList.indexWhere((wordJson) => wordJson['createdAt'] == oldWord.createdAt);
+
+      if (index != -1) { // 단어를 찾았다면
+        updatedWordData['review_stats'] = oldWord.reviewStats;
+        wordList[index] = updatedWordData;
+        await writeData(allData);
+        print("단어 수정 완료: ${updatedWordData['word']}");
+      }
+    }
+  }
+
+  // 단어의 복습 정보 업데이트
+  Future<void> updateWordReviewStats(String deckName, Word word) async {
+    final allData = await readData();
+    final deck = allData['decks'][deckName];
+    if (deck != null && deck['words'] != null) {
+      final wordList = deck['words'] as List;
+      final index = wordList.indexWhere((wordJson) => wordJson['createdAt'] == word.createdAt);
+      if (index != -1) {
+        // 기존 단어 데이터를 찾아서 review_stats 부분만 교체
+        wordList[index]['review_stats'] = word.reviewStats;
+        await writeData(allData);
+        print("복습 정보 업데이트 완료: ${word.word}");
+      }
+    }
+  }
+}
