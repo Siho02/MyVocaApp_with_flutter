@@ -149,4 +149,37 @@ class DataManager {
       }
     }
   }
+
+  // 학습 로그 기록 
+  Future<void> logStudySession(String deckName, int correctAnswers, int incorrectAnswers) async {
+    // 0개의 단어를 학습한 경우는 기록하지 않음
+    if (correctAnswers == 0 && incorrectAnswers == 0) return;
+
+    final allData = await readData();
+    final deck = allData['decks'][deckName];
+
+    // study_log가 없으면 새로 생성
+    deck['study_log'] ??= {}; 
+    
+    // 오늘 날짜를 'YYYY-MM-DD' 형식의 문자열로 만듦
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    
+    // 오늘 날짜의 로그가 없으면 새로 생성
+    deck['study_log'][today] ??= {'correct_count': 0, 'incorrect_count': 0};
+
+    // 오늘 날짜의 로그에 정답/오답 개수 누적
+    deck['study_log'][today]['correct_count'] += correctAnswers;
+    deck['study_log'][today]['incorrect_count'] += incorrectAnswers;
+
+    await writeData(allData);
+    print("학습 로그 기록 완료: $today");
+  }
+
+  // 특정 덱의 학습로그 가져오기 
+  Future<Map<String, dynamic>> getStudyLogForDeck(String deckName) async {
+    final allData = await readData();
+    final deck = allData['decks'][deckName];
+    // study_log가 존재하면 해당 맵을, 없으면 빈 맵을 반환
+    return deck?['study_log'] as Map<String, dynamic>? ?? {};
+  }
 }

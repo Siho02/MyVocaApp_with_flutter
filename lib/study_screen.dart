@@ -20,6 +20,8 @@ class _StudyScreenState extends State<StudyScreen> {
   List<Word> _reviewWords = [];
   int _currentIndex = 0;
   bool _isLoading = true;
+  int _sessionCorrect = 0;
+  int _sessionIncorrect = 0;
 
   bool _isSubjective = false;
   List<String> _choices = []; 
@@ -76,9 +78,14 @@ class _StudyScreenState extends State<StudyScreen> {
   // 정답 확인 및 결과 처리 함수
   Future<void> _checkAnswer(String userAnswer) async {
     final currentWord = _reviewWords[_currentIndex];
-    // 정답 여부 확인 (여러 뜻 중 하나라도 맞으면 정답)
     final isCorrect = currentWord.meaning.contains(userAnswer.trim());
     
+    if (isCorrect) {
+      _sessionCorrect++;
+    } else {
+      _sessionIncorrect++;
+    }
+
     // --- SRS(간격 반복 시스템) 로직 ---
     final stats = currentWord.reviewStats['study_to_native'];
     if (isCorrect) {
@@ -113,6 +120,7 @@ class _StudyScreenState extends State<StudyScreen> {
       });
       _prepareNextQuestion();
     } else {
+      await _dataManager.logStudySession(widget.deckName, _sessionCorrect, _sessionIncorrect);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('오늘의 학습을 모두 마쳤습니다!')));
         Navigator.pop(context);

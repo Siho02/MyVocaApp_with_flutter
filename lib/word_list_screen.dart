@@ -1,5 +1,3 @@
-// lib/word_list_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:voca_app/data_manager.dart';
 import 'package:voca_app/models/word.dart';
@@ -14,20 +12,56 @@ class WordListScreen extends StatefulWidget {
 }
 
 class _WordListScreenState extends State<WordListScreen> {
-  // DataManager를 통해 단어 목록을 비동기적으로 불러옴
-  late Future<List<Word>> _wordsFuture;
   final DataManager dataManager = DataManager();
+  final TextEditingController _searchController = TextEditingController();
+
+  // 1. 상태 변수 추가
+  List<Word> _allWords = [];
+  List<Word> _filteredWords = []; 
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _wordsFuture = dataManager.getWordsForDeck(widget.deckName);
+    _searchController.addListener(_filterWords);
+    _loadWords();
   }
-  void _refreshWords() {
+  
+  // 최초에 한 번만 파일에서 모든 단어를 불러오는 함수
+  Future<void> _loadWords() async {
+    final words = await dataManager.getWordsForDeck(widget.deckName);
     setState(() {
-      _wordsFuture = dataManager.getWordsForDeck(widget.deckName);
+      _allWords = words;
+      _filteredWords = words; // 처음에는 모든 단어를 보여줌
+      _isLoading = false;
     });
   }
+
+  // 검색 텍스트에 따라 _filteredWords 리스트를 갱신하는 함수
+  void _filterWords() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _filteredWords = _allWords.where((word) {
+        final wordLower = word.word.toLowerCase();
+        final meaningLower = word.meaning.join(' ').toLowerCase();
+        return wordLower.contains(query) || meaningLower.contains(query);
+      }).toList();
+    });
+  }
+  
+  // 화면이 사라질 때 컨트롤러 정리
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // 화면 새로고침 함수 (이제 _loadWords를 직접 호출)
+  void _refreshWords() {
+    setState(() { _isLoading = true; });
+    _loadWords();
+  }
+
   void _showOptionsSheet(Word word) {
     showModalBottomSheet(
       context: context,
@@ -37,9 +71,8 @@ class _WordListScreenState extends State<WordListScreen> {
             ListTile(
               leading: const Icon(Icons.edit),
               title: const Text('수정하기'),
-              onTap: () async{
+              onTap: () async {
                 Navigator.pop(context);
-
                 final result = await Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -49,19 +82,17 @@ class _WordListScreenState extends State<WordListScreen> {
                     ),
                   ),
                 );
-
-                if (result == true){
+                if (result == true) {
                   _refreshWords();
                 }
               },
-            
             ),
             ListTile(
               leading: const Icon(Icons.delete),
               title: const Text('삭제하기'),
               onTap: () {
-                Navigator.pop(context); // 바텀 시트 먼저 닫기
-                _confirmDelete(word);   // 삭제 확인 팝업 띄우기
+                Navigator.pop(context);
+                _confirmDelete(word);
               },
             ),
           ],
@@ -83,11 +114,11 @@ class _WordListScreenState extends State<WordListScreen> {
               onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
-              child: const Text('삭제'),
+              child: const Text('삭제', style: TextStyle(color: Colors.red)),
               onPressed: () async {
                 await dataManager.deleteWordFromDeck(widget.deckName, word);
-                Navigator.of(context).pop(); // 확인 팝업 닫기
-                _refreshWords(); // 화면 새로고침
+                Navigator.of(context).pop();
+                _refreshWords();
               },
             ),
           ],
@@ -96,40 +127,51 @@ class _WordListScreenState extends State<WordListScreen> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.deckName}: 단어 목록'),
       ),
-      // FutureBuilder: 비동기 데이터 로딩 상태를 손쉽게 처리해주는 위젯
-      body: FutureBuilder<List<Word>>(
-        future: _wordsFuture, // 이 Future의 상태를 감시
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('에러가 발생했습니다: ${snapshot.error}'));
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('저장된 단어가 없습니다.'));
-          }
-          final words = snapshot.data!;
-          return ListView.builder(
-            itemCount: words.length,
-            itemBuilder: (context, index) {
-              final word = words[index];
-              return ListTile(
-                title: Text(word.word),
-                subtitle: Text(word.meaning.join(', ')),
-                onTap: () => _showOptionsSheet(word),
-              );
-            },
-          );
-        },
-      ),
+      // 2. body 구조 변경
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                children: [
+                  // --- 검색창 UI 추가 ---
+                  TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: '단어 또는 뜻으로 검색...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.0),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // --- 단어 목록 부분 ---
+                  Expanded(
+                    child: _filteredWords.isEmpty
+                        ? const Center(child: Text('일치하는 단어가 없습니다.'))
+                        : ListView.builder(
+                            itemCount: _filteredWords.length,
+                            itemBuilder: (context, index) {
+                              final word = _filteredWords[index];
+                              return ListTile(
+                                title: Text(word.word),
+                                subtitle: Text(word.meaning.join(', ')),
+                                onTap: () => _showOptionsSheet(word),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }
