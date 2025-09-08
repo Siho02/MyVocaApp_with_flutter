@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert'; 
 import 'package:path_provider/path_provider.dart'; 
 import 'package:voca_app/models/word.dart'; 
+import 'package:csv/csv.dart';
 
 class DataManager {
   Future<File> get _localFile async {
@@ -85,6 +86,44 @@ class DataManager {
     allData['decks'][deckName] = deck;
     await writeData(allData);
     print("단어 저장 완료 (복습 정보 포함): $newWord");
+  }
+  
+  // CSV파일로 덱에 단어 추가 
+  Future<int> addWordsFromCsv(String path, String deckName) async {
+    try {
+      final file = File(path);
+      final csvString = await file.readAsString(encoding: utf8);
+      final List<List<dynamic>> csvTable = const CsvToListConverter().convert(csvString);
+      
+      int addedCount = 0;
+      for (final row in csvTable) {
+        if (row.length >= 2) {
+          final String word = row[0].toString().trim();
+          final String allMeanings = row[1].toString().trim();
+          
+          final List<String> meanings = allMeanings.split(';')
+                                          .map((m) => m.trim()) // 각 뜻의 앞뒤 공백 제거
+                                          .where((m) => m.isNotEmpty) // 비어있는 뜻은 제외
+                                          .toList();
+
+          if (word.isNotEmpty && meanings.isNotEmpty) {
+            final newWord = {
+              'word': word,
+              'meaning': meanings,
+              'example': '', 
+              'createdAt': DateTime.now().toIso8601String(),
+            };
+            await addWordToDeck(deckName, newWord);
+            addedCount++;
+          }
+        }
+      }
+      return addedCount;
+
+    } catch (e) {
+      print("CSV 처리 중 오류 발생: $e");
+      return 0;
+    }
   }
 
   // 덱에 저장된 단어 조회

@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:voca_app/data_manager.dart';
+import 'package:flutter_heatmap_calendar/flutter_heatmap_calendar.dart';
 
 class StatsScreen extends StatefulWidget {
   final String deckName;
@@ -17,6 +18,7 @@ class _StatsScreenState extends State<StatsScreen> {
   int _totalCorrect = 0;
   int _totalIncorrect = 0;
   Map<String, dynamic> _studyLog = {};
+  Map<DateTime, int> _heatmapDatasets = {};
 
   @override
   void initState() {
@@ -30,20 +32,26 @@ class _StatsScreenState extends State<StatsScreen> {
     
     int correctSum = 0;
     int incorrectSum = 0;
+    Map<DateTime, int> datasets = {};
 
-    // log 맵의 모든 값을 순회하며 정답/오답 횟수를 합산
-    log.forEach((date, dailyLog) {
-      correctSum += dailyLog['correct_count'] as int? ?? 0;
-      incorrectSum += dailyLog['incorrect_count'] as int? ?? 0;
+    log.forEach((dateString, dailyLog) {
+      final correct = dailyLog['correct_count'] as int? ?? 0;
+      final incorrect = dailyLog['incorrect_count'] as int? ?? 0;
+      
+      correctSum += correct;
+      incorrectSum += incorrect;
+
+      final date = DateTime.parse(dateString);
+      datasets[date] = correct + incorrect;
     });
 
-    // 3. 계산된 값을 setState를 통해 상태 변수에 저장하고 화면 갱신
     setState(() {
-      _studyLog = log;
       _totalCorrect = correctSum;
       _totalIncorrect = incorrectSum;
+      _heatmapDatasets = datasets; // 변환된 데이터를 상태 변수에 저장
       _isLoading = false;
     });
+
   }
 
   @override
@@ -66,7 +74,6 @@ class _StatsScreenState extends State<StatsScreen> {
                     child: ListTile(
                       leading: const Icon(Icons.check_circle, color: Colors.green),
                       title: const Text('총 정답'),
-                      // 4. 하드코딩된 '0 개' 대신 상태 변수 사용
                       trailing: Text('$_totalCorrect 개', style: const TextStyle(fontSize: 16)),
                     ),
                   ),
@@ -74,21 +81,31 @@ class _StatsScreenState extends State<StatsScreen> {
                     child: ListTile(
                       leading: const Icon(Icons.cancel, color: Colors.red),
                       title: const Text('총 오답'),
-                      // 4. 하드코딩된 '0 개' 대신 상태 변수 사용
                       trailing: Text('$_totalIncorrect 개', style: const TextStyle(fontSize: 16)),
                     ),
                   ),
                   const SizedBox(height: 24),
                   Text('학습 활동', style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 8),
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Center(
-                        child: Text('여기에 학습 활동 그래프가 표시될 예정입니다.'),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: HeatMapCalendar(
+                        datasets: _heatmapDatasets,
+                        colorMode: ColorMode.color,
+                        showColorTip: false, // 색상별 수치 안내 팁 숨기기
+                        colorsets: const {
+                          1: Color.fromARGB(255, 160, 215, 239), // 1~3개: 연한 파랑
+                          4: Color.fromARGB(255, 108, 184, 216), // 4~6개
+                          7: Color.fromARGB(255, 50, 150, 190),  // 7~9개
+                          10: Color.fromARGB(255, 1, 97, 138),  // 10개 이상: 진한 파랑
+                        },
+                        onClick: (date) {
+                          final count = _heatmapDatasets[date] ?? 0;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('${date.toLocal().toString().substring(0, 10)}: 총 ${count}개 학습'))
+                          );
+                        },
                       ),
                     ),
                   ),
