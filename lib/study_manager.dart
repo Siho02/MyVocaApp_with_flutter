@@ -29,14 +29,19 @@ class StudyManager {
   //객관식 오답 보기 함수 
   Future<List<String>> getDistractors(String deckName, Word correctWord) async {
     final allWords = await _dataManager.getWordsForDeck(deckName);
-    // 현재 단어의 뜻을 제외한 모든 단어의 뜻을 하나의 리스트로 만듦
-    final pool = allWords
-        .where((word) => word.createdAt != correctWord.createdAt)
-        .expand((word) => word.meaning)
-        .toList();
     
-    final distinctPool = pool.toSet().toList();
-    distinctPool.shuffle();
-    return distinctPool.take(min(3, distinctPool.length)).toList();
+    final List<Word> otherWords = allWords
+        .where((word) => word.createdAt != correctWord.createdAt)
+        .toList();
+
+    List<String> meaningPool = [];
+    for (var word in otherWords) {
+      meaningPool.addAll(word.meaning);
+    }
+    meaningPool = meaningPool.toSet().toList();
+    meaningPool.removeWhere((meaning) => correctWord.meaning.contains(meaning));
+    meaningPool.shuffle();
+
+    return meaningPool.take(min(3, meaningPool.length)).toList();
   }
 }

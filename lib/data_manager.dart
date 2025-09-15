@@ -93,24 +93,29 @@ class DataManager {
     try {
       final file = File(path);
       final csvString = await file.readAsString(encoding: utf8);
-      final List<List<dynamic>> csvTable = const CsvToListConverter().convert(csvString);
       
+      final List<List<dynamic>> csvTable = CsvToListConverter(
+        fieldDelimiter: ',', 
+      ).convert(csvString).skip(1).toList();
+
       int addedCount = 0;
       for (final row in csvTable) {
-        if (row.length >= 2) {
+        if (row.length >= 2) { 
           final String word = row[0].toString().trim();
           final String allMeanings = row[1].toString().trim();
           
           final List<String> meanings = allMeanings.split(';')
-                                          .map((m) => m.trim()) // 각 뜻의 앞뒤 공백 제거
-                                          .where((m) => m.isNotEmpty) // 비어있는 뜻은 제외
+                                          .map((m) => m.trim())
+                                          .where((m) => m.isNotEmpty)
                                           .toList();
+          
+          final String example = row.length > 2 ? row[2].toString().trim() : '';
 
           if (word.isNotEmpty && meanings.isNotEmpty) {
             final newWord = {
               'word': word,
               'meaning': meanings,
-              'example': '', 
+              'example': example,
               'createdAt': DateTime.now().toIso8601String(),
             };
             await addWordToDeck(deckName, newWord);
