@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'dart:io'; 
 import 'dart:convert'; 
 import 'package:path_provider/path_provider.dart'; 
@@ -225,5 +226,80 @@ class DataManager {
     final deck = allData['decks'][deckName];
     // study_log가 존재하면 해당 맵을, 없으면 빈 맵을 반환
     return deck?['study_log'] as Map<String, dynamic>? ?? {};
+  }
+
+  // 앱 데이터 백업
+  Future<bool> backupData(String destinationPath) async {
+    try {
+      final sourceFile = await _localFile; // 현재 앱 데이터 파일
+      if (!await sourceFile.exists()) {
+        print("백업할 데이터 파일이 존재하지 않습니다.");
+        return false;
+      }
+      final destinationFile = File(destinationPath);
+      await sourceFile.copy(destinationFile.path); // 파일을 복사하여 백업
+      print("데이터 백업 완료: ${destinationFile.path}");
+      return true;
+    } catch (e) {
+      print("데이터 백업 중 오류 발생: $e");
+      return false;
+    }
+  }
+
+  // 앱 데이터 복원
+  Future<bool> restoreData(String sourcePath) async {
+    try {
+      final sourceFile = File(sourcePath); // 복원할 백업 파일
+      if (!await sourceFile.exists()) {
+        print("복원할 백업 파일이 존재하지 않습니다.");
+        return false;
+      }
+      final destinationFile = await _localFile; // 현재 앱 데이터 파일 경로
+      await sourceFile.copy(destinationFile.path); // 백업 파일을 현재 앱 데이터 파일로 복사
+      print("데이터 복원 완료: ${destinationFile.path}");
+      return true;
+    } catch (e) {
+      print("데이터 복원 중 오류 발생: $e");
+      return false;
+    }
+  }
+
+  //앱 테마 설정
+  Future<ThemeMode> getAppThemeMode() async {
+    final data = await readData();
+    // 'settings' 맵이 없으면 빈 맵으로 초기화
+    data['settings'] ??= {}; 
+    final themeModeString = data['settings']['themeMode'] ?? 'system'; // 기본값은 'system'
+    switch (themeModeString) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      case 'system':
+      default:
+        return ThemeMode.system;
+    }
+  }
+
+  // 앱 테마 설정 저장
+  Future<void> saveAppThemeMode(ThemeMode themeMode) async {
+    final allData = await readData();
+    allData['settings'] ??= {}; // 'settings' 맵이 없으면 빈 맵으로 초기화
+    String themeModeString;
+    switch (themeMode) {
+      case ThemeMode.light:
+        themeModeString = 'light';
+        break;
+      case ThemeMode.dark:
+        themeModeString = 'dark';
+        break;
+      case ThemeMode.system:
+      default:
+        themeModeString = 'system';
+        break;
+    }
+    allData['settings']['themeMode'] = themeModeString;
+    await writeData(allData);
+    print("앱 테마 설정 저장 완료: $themeModeString");
   }
 }
