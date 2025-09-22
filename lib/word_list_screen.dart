@@ -1,7 +1,9 @@
+// lib/word_list_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:voca_app/data_manager.dart';
 import 'package:voca_app/models/word.dart';
-import 'package:voca_app/word_form_screen.dart';
+import 'package:voca_app/word_form_screen.dart'; // <--- 정확한 파일 import
 
 class WordListScreen extends StatefulWidget {
   final String deckName;
@@ -15,9 +17,8 @@ class _WordListScreenState extends State<WordListScreen> {
   final DataManager dataManager = DataManager();
   final TextEditingController _searchController = TextEditingController();
 
-  // 1. 상태 변수 추가
   List<Word> _allWords = [];
-  List<Word> _filteredWords = []; 
+  List<Word> _filteredWords = [];
   bool _isLoading = true;
 
   @override
@@ -27,17 +28,15 @@ class _WordListScreenState extends State<WordListScreen> {
     _loadWords();
   }
   
-  // 최초에 한 번만 파일에서 모든 단어를 불러오는 함수
   Future<void> _loadWords() async {
     final words = await dataManager.getWordsForDeck(widget.deckName);
     setState(() {
       _allWords = words;
-      _filteredWords = words; // 처음에는 모든 단어를 보여줌
+      _filteredWords = words;
       _isLoading = false;
     });
   }
 
-  // 검색 텍스트에 따라 _filteredWords 리스트를 갱신하는 함수
   void _filterWords() {
     final query = _searchController.text.toLowerCase();
     setState(() {
@@ -49,82 +48,16 @@ class _WordListScreenState extends State<WordListScreen> {
     });
   }
   
-  // 화면이 사라질 때 컨트롤러 정리
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
-  // 화면 새로고침 함수 (이제 _loadWords를 직접 호출)
   void _refreshWords() {
     setState(() { _isLoading = true; });
+    _searchController.clear(); // 새로고침 시 검색어도 초기화
     _loadWords();
-  }
-
-  void _showOptionsSheet(Word word) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return Wrap(
-          children: <Widget>[
-            ListTile(
-              leading: const Icon(Icons.edit),
-              title: const Text('수정하기'),
-              onTap: () async {
-                Navigator.pop(context);
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => WordFormScreen(
-                      deckName: widget.deckName,
-                      wordToEdit: word,
-                    ),
-                  ),
-                );
-                if (result == true) {
-                  _refreshWords();
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete),
-              title: const Text('삭제하기'),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmDelete(word);
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _confirmDelete(Word word) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('삭제 확인'),
-          content: Text("'${word.word}' 단어를 정말로 삭제하시겠습니까?"),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('취소'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            TextButton(
-              child: const Text('삭제', style: TextStyle(color: Colors.red)),
-              onPressed: () async {
-                await dataManager.deleteWordFromDeck(widget.deckName, word);
-                Navigator.of(context).pop();
-                _refreshWords();
-              },
-            ),
-          ],
-        );
-      },
-    );
   }
 
   @override
@@ -133,14 +66,12 @@ class _WordListScreenState extends State<WordListScreen> {
       appBar: AppBar(
         title: Text('${widget.deckName}: 단어 목록'),
       ),
-      // 2. body 구조 변경
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
               padding: const EdgeInsets.all(8.0),
               child: Column(
                 children: [
-                  // --- 검색창 UI 추가 ---
                   TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
@@ -152,8 +83,6 @@ class _WordListScreenState extends State<WordListScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-
-                  // --- 단어 목록 부분 ---
                   Expanded(
                     child: _filteredWords.isEmpty
                         ? const Center(child: Text('일치하는 단어가 없습니다.'))
@@ -161,10 +90,98 @@ class _WordListScreenState extends State<WordListScreen> {
                             itemCount: _filteredWords.length,
                             itemBuilder: (context, index) {
                               final word = _filteredWords[index];
-                              return ListTile(
-                                title: Text(word.word),
-                                subtitle: Text(word.meaning.join(', ')),
-                                onTap: () => _showOptionsSheet(word),
+                              
+                              return Dismissible(
+                                key: Key(word.createdAt), // 고유 ID인 createdAt을 Key로 사용
+                                
+                                background: Container( // 왼쪽 -> 오른쪽 (수정)
+                                  color: Colors.blue,
+                                  alignment: Alignment.centerLeft,
+                                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                                  child: const Icon(Icons.edit, color: Colors.white),
+                                ),
+                                
+                                secondaryBackground: Container( // 오른쪽 -> 왼쪽 (삭제)
+                                  color: Colors.red,
+                                  alignment: Alignment.centerRight,
+                                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                                  child: const Icon(Icons.delete, color: Colors.white),
+                                ),
+                                
+                                confirmDismiss: (direction) async {
+                                  if (direction == DismissDirection.endToStart) { // 삭제 방향
+                                    return await showDialog(
+                                      context: context,
+                                      builder: (BuildContext context) {
+                                        return AlertDialog(
+                                          title: const Text('단어 삭제 확인'),
+                                          content: Text("'${word.word}' 단어를 정말로 삭제하시겠습니까?"),
+                                          actions: <Widget>[
+                                            TextButton(
+                                              child: const Text('취소'),
+                                              onPressed: () => Navigator.of(context).pop(false),
+                                            ),
+                                            TextButton(
+                                              child: const Text('삭제', style: TextStyle(color: Colors.red)),
+                                              onPressed: () => Navigator.of(context).pop(true),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    );
+                                  } else { // 수정 방향
+                                    // 수정은 확인 없이 바로 진행
+                                    return true;
+                                  }
+                                },
+                                
+                                onDismissed: (direction) async {
+                                  if (direction == DismissDirection.endToStart) { // 삭제
+                                    await dataManager.deleteWordFromDeck(widget.deckName, word);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text("'${word.word}' 단어가 삭제되었습니다.")),
+                                    );
+                                    _refreshWords();
+                                  } else if (direction == DismissDirection.startToEnd) { // 수정
+                                    final result = await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => WordFormScreen(
+                                          deckName: widget.deckName,
+                                          wordToEdit: word,
+                                        ),
+                                      ),
+                                    );
+                                    if (result == true) {
+                                      _refreshWords();
+                                    } else {
+                                      // 수정 취소 시 화면을 원래대로 돌리기 위해 새로고침
+                                      _refreshWords();
+                                    }
+                                  }
+                                },
+                                
+                                child: Card(
+                                  child: ListTile(
+                                    title: Text(word.word),
+                                    subtitle: Text(word.meaning.join(', ')),
+                                    onTap: () async {
+                                      // 탭했을 때도 수정 화면으로 이동
+                                      final result = await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => WordFormScreen(
+                                            deckName: widget.deckName,
+                                            wordToEdit: word,
+                                          ),
+                                        ),
+                                      );
+                                      if (result == true) {
+                                        _refreshWords();
+                                      }
+                                    },
+                                  ),
+                                ),
                               );
                             },
                           ),

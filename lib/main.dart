@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:voca_app/data_manager.dart';
 import 'package:voca_app/home_screen.dart';
-import 'package:voca_app/settings_screen.dart'; // <--- 설정 화면 import
+import 'package:voca_app/settings_screen.dart'; 
 import 'package:file_picker/file_picker.dart';
 
 void main() {
@@ -270,13 +270,11 @@ class _DeckSelectionScreenState extends State<DeckSelectionScreen> {
       appBar: AppBar(
         title: const Text('나의 단어장'),
         actions: [
-          // 앱 데이터 관리 버튼
           IconButton(
             icon: const Icon(Icons.storage),
             onPressed: _showDataManagementOptions,
             tooltip: '앱 데이터 관리',
           ),
-          // --- [새 기능] 설정 버튼 추가 ---
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: _navigateToSettings,
@@ -292,22 +290,74 @@ class _DeckSelectionScreenState extends State<DeckSelectionScreen> {
                   itemCount: _deckNames.length,
                   itemBuilder: (context, index) {
                     final deckName = _deckNames[index];
-                    return Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.folder_open),
-                        title: Text(deckName),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.redAccent),
-                          onPressed: () => _confirmDeleteDeck(deckName),
+                    
+                    return Dismissible(
+                      key: Key(deckName), 
+                      // 1. direction: 오른쪽에서 왼쪽으로 미는 것만 허용
+                      direction: DismissDirection.endToStart, 
+                      
+                      // background: 오른쪽에서 왼쪽으로 밀 때 나타나는 배경
+                      background: Container(
+                        color: Colors.red,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                      
+                      // 2. confirmDismiss: 스와이프가 끝났을 때 사용자에게 확인을 요청합니다.
+                      confirmDismiss: (direction) async {
+                        // showDialog를 띄워 사용자에게 삭제 여부를 묻습니다.
+                        return await showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              title: const Text('삭제 확인'),
+                              content: Text("'$deckName' 덱을 정말로 삭제하시겠습니까?"),
+                              actions: <Widget>[
+                                TextButton(
+                                  child: const Text('취소'),
+                                  onPressed: () => Navigator.of(context).pop(false), // 취소 시 false 반환
+                                ),
+                                TextButton(
+                                  child: const Text('삭제', style: TextStyle(color: Colors.red)),
+                                  onPressed: () => Navigator.of(context).pop(true), // 삭제 시 true 반환
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                      
+                      // onDismissed: 사용자가 삭제를 '확인'했을 때만 호출됩니다.
+                      onDismissed: (direction) {
+                        // 3. 실제 삭제 로직 호출
+                        dataManager.deleteDeck(deckName);
+
+                        // UI에서도 즉시 목록을 갱신합니다.
+                        // 이전에 _deckNames.removeAt(index)를 사용했지만,
+                        // _loadDeckNames()를 다시 호출하는 것이 데이터 일관성 면에서 더 안전합니다.
+                        _loadDeckNames(); 
+
+                        // 사용자에게 삭제되었음을 알려줍니다.
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("'$deckName' 덱이 삭제되었습니다.")),
+                        );
+                      },
+                      
+                      // child: 기존 카드 UI는 그대로 유지
+                      child: Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.folder_open),
+                          title: Text(deckName),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => HomeScreen(deckName: deckName),
+                              ),
+                            ).then((_) => _loadDeckNames());
+                          },
                         ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => HomeScreen(deckName: deckName),
-                            ),
-                          ).then((_) => _loadDeckNames()); // 덱으로 돌아올 때 목록 새로고침
-                        },
                       ),
                     );
                   },
