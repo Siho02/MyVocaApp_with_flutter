@@ -134,12 +134,18 @@ class DataManager {
 
   // 덱에 저장된 단어 조회
   Future<List<Word>> getWordsForDeck(String deckName) async {
+    print("--- [DataManager] '${deckName}' 덱의 단어 로딩 시작 ---");
     final allData = await readData();
     final deck = allData['decks'][deckName];
 
     if (deck != null && deck['words'] != null) {
       final wordList = deck['words'] as List;
+      print("--- [DataManager] ${wordList.length}개의 단어 발견, 변환 시작 ---");
       return wordList.map((wordJson) => Word.fromJson(wordJson)).toList();
+      print("--- [DataManager] 단어 변환 완료 ---");
+    } else {
+      print("--- [DataManager] 덱 또는 단어 목록이 존재하지 않음 ---");
+      return [];
     }
     return [];
   }

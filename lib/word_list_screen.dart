@@ -3,7 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:voca_app/data_manager.dart';
 import 'package:voca_app/models/word.dart';
-import 'package:voca_app/word_form_screen.dart'; // <--- 정확한 파일 import
+import 'package:voca_app/word_form_screen.dart'; 
+import 'package:flutter/rendering.dart';
 
 class WordListScreen extends StatefulWidget {
   final String deckName;
@@ -17,6 +18,9 @@ class _WordListScreenState extends State<WordListScreen> {
   final DataManager dataManager = DataManager();
   final TextEditingController _searchController = TextEditingController();
 
+  final ScrollController _scrollController = ScrollController();
+  bool _showFab = true; // FloatingActionButton 표시 여부
+
   List<Word> _allWords = [];
   List<Word> _filteredWords = [];
   bool _isLoading = true;
@@ -24,17 +28,53 @@ class _WordListScreenState extends State<WordListScreen> {
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(_filterWords);
-    _loadWords();
+    print("--- [WordListScreen] initState 시작 ---"); // 디버깅용
+    try {
+      _searchController.addListener(_filterWords);
+      _loadWords();
+      _scrollController.addListener(() {
+        if (_scrollController.position.userScrollDirection == ScrollDirection.reverse) {
+          if (_showFab) setState(() => _showFab = false);
+        } else {
+          if (!_showFab) setState(() => _showFab = true);
+        }
+      });
+      print("--- [WordListScreen] initState 완료 ---"); // 디버깅용
+    } catch (e) {
+      print("!!!!!! [WordListScreen] initState 중 심각한 오류 발생 !!!!!!"); // 디버깅용
+      print(e); // 오류 상세 출력
+      setState(() {
+        _isLoading = false; // 오류 발생 시 로딩 중지
+      });
+    }
   }
+
   
   Future<void> _loadWords() async {
-    final words = await dataManager.getWordsForDeck(widget.deckName);
-    setState(() {
-      _allWords = words;
-      _filteredWords = words;
-      _isLoading = false;
-    });
+    print("--- [WordListScreen] 데이터 로딩 시작 ---");
+    print("--- [WordListScreen] 덱 이름 확인: '${widget.deckName}' ---");
+
+    try {
+      final words = await dataManager.getWordsForDeck(widget.deckName);
+      print("--- [WordListScreen] 데이터 로딩 완료, ${words.length}개 단어 받음 ---");
+      
+      if (mounted) {
+        setState(() {
+          _allWords = words;
+          _filteredWords = words;
+          _isLoading = false;
+        });
+        print("--- [WordListScreen] setState 호출 완료, 화면 갱신 예정 ---");
+      }
+    } catch (e) {
+      print("!!!!!! [WordListScreen] 데이터 로딩 중 심각한 오류 발생 !!!!!!");
+      print(e);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _filterWords() {
@@ -51,6 +91,7 @@ class _WordListScreenState extends State<WordListScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -152,12 +193,7 @@ class _WordListScreenState extends State<WordListScreen> {
                                         ),
                                       ),
                                     );
-                                    if (result == true) {
-                                      _refreshWords();
-                                    } else {
-                                      // 수정 취소 시 화면을 원래대로 돌리기 위해 새로고침
-                                      _refreshWords();
-                                    }
+                                    _refreshWords();
                                   }
                                 },
                                 
@@ -182,13 +218,34 @@ class _WordListScreenState extends State<WordListScreen> {
                                     },
                                   ),
                                 ),
-                              );
+                              );                                                             
                             },
                           ),
                   ),
                 ],
               ),
             ),
+    floatingActionButton: AnimatedOpacity(
+        opacity: _showFab ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 300), // 애니메이션 지속 시간
+        child: Visibility(
+          visible: _showFab, // 실제 위젯의 가시성을 제어 (숨겨질 때 터치 이벤트 방지)
+          child: FloatingActionButton.extended(
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => WordFormScreen(deckName: widget.deckName)),
+              );
+              if (result == true) {
+                _refreshWords();
+              }
+            },
+            label: const Text('단어 추가'),
+            icon: const Icon(Icons.add),
+          ),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }
