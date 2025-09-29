@@ -5,6 +5,8 @@ import 'package:voca_app/data_manager.dart';
 import 'package:voca_app/models/word.dart';
 import 'package:voca_app/word_form_screen.dart'; 
 import 'package:flutter/rendering.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:shimmer/shimmer.dart'; 
 
 class WordListScreen extends StatefulWidget {
   final String deckName;
@@ -101,151 +103,159 @@ class _WordListScreenState extends State<WordListScreen> {
     _loadWords();
   }
 
+  Widget _buildLoadingSkeleton() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: ListView.builder(
+        itemCount: 10,
+        itemBuilder: (context, index) {
+          return Card(
+            child: ListTile(
+              leading: Container(width: 24, height: 24, color: Colors.white),
+              title: Container(
+                width: double.infinity,
+                height: 16.0,
+                color: Colors.white,
+                margin: const EdgeInsets.only(right: 40.0), // 실제 텍스트처럼 보이게
+              ),
+              subtitle: Container(
+                width: double.infinity,
+                height: 14.0,
+                color: Colors.white,
+                margin: const EdgeInsets.only(right: 80.0), // 실제 텍스트처럼 보이게
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.deckName}: 단어 목록'),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: '단어 또는 뜻으로 검색...',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.0),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: _filteredWords.isEmpty
-                        ? const Center(child: Text('일치하는 단어가 없습니다.'))
-                        : ListView.builder(
+      body: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          children: [
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: '단어 또는 뜻으로 검색...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: _isLoading
+                  ? _buildLoadingSkeleton() // 로딩 중일 때는 스켈레톤 UI 표시
+                  : _filteredWords.isEmpty
+                      ? const Center(child: Text('일치하는 단어가 없습니다.'))
+                      : AnimationLimiter( // 애니메이션 적용 시작
+                          child: ListView.builder(
+                            controller: _scrollController,
                             itemCount: _filteredWords.length,
                             itemBuilder: (context, index) {
                               final word = _filteredWords[index];
-                              
-                              return Dismissible(
-                                key: Key(word.createdAt), // 고유 ID인 createdAt을 Key로 사용
-                                
-                                background: Container( // 왼쪽 -> 오른쪽 (수정)
-                                  color: Colors.blue,
-                                  alignment: Alignment.centerLeft,
-                                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                                  child: const Icon(Icons.edit, color: Colors.white),
-                                ),
-                                
-                                secondaryBackground: Container( // 오른쪽 -> 왼쪽 (삭제)
-                                  color: Colors.red,
-                                  alignment: Alignment.centerRight,
-                                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                                  child: const Icon(Icons.delete, color: Colors.white),
-                                ),
-                                
-                                confirmDismiss: (direction) async {
-                                  if (direction == DismissDirection.endToStart) { // 삭제 방향
-                                    return await showDialog(
-                                      context: context,
-                                      builder: (BuildContext context) {
-                                        return AlertDialog(
-                                          title: const Text('단어 삭제 확인'),
-                                          content: Text("'${word.word}' 단어를 정말로 삭제하시겠습니까?"),
-                                          actions: <Widget>[
-                                            TextButton(
-                                              child: const Text('취소'),
-                                              onPressed: () => Navigator.of(context).pop(false),
-                                            ),
-                                            TextButton(
-                                              child: const Text('삭제', style: TextStyle(color: Colors.red)),
-                                              onPressed: () => Navigator.of(context).pop(true),
-                                            ),
-                                          ],
-                                        );
+                              return AnimationConfiguration.staggeredList(
+                                position: index,
+                                duration: const Duration(milliseconds: 375),
+                                child: SlideAnimation(
+                                  verticalOffset: 50.0,
+                                  child: FadeInAnimation(
+                                    child: Dismissible(
+                                      key: Key(word.createdAt),
+                                      background: Container(
+                                        color: Colors.blue,
+                                        alignment: Alignment.centerLeft,
+                                        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                                        child: const Icon(Icons.edit, color: Colors.white),
+                                      ),
+                                      secondaryBackground: Container(
+                                        color: Colors.red,
+                                        alignment: Alignment.centerRight,
+                                        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                                        child: const Icon(Icons.delete, color: Colors.white),
+                                      ),
+                                      confirmDismiss: (direction) async {
+                                        if (direction == DismissDirection.endToStart) {
+                                          return await showDialog<bool>(
+                                            context: context,
+                                            builder: (BuildContext context) {
+                                              return AlertDialog(
+                                                title: const Text('단어 삭제 확인'),
+                                                content: Text("'${word.word}' 단어를 정말로 삭제하시겠습니까?"),
+                                                actions: <Widget>[
+                                                  TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('취소')),
+                                                  TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('삭제', style: TextStyle(color: Colors.red))),
+                                                ],
+                                              );
+                                            },
+                                          ) ?? false;
+                                        }
+                                        return true;
                                       },
-                                    );
-                                  } else { // 수정 방향
-                                    // 수정은 확인 없이 바로 진행
-                                    return true;
-                                  }
-                                },
-                                
-                                onDismissed: (direction) async {
-                                  if (direction == DismissDirection.endToStart) { // 삭제
-                                    await dataManager.deleteWordFromDeck(widget.deckName, word);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text("'${word.word}' 단어가 삭제되었습니다.")),
-                                    );
-                                    _refreshWords();
-                                  } else if (direction == DismissDirection.startToEnd) { // 수정
-                                    final result = await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => WordFormScreen(
-                                          deckName: widget.deckName,
-                                          wordToEdit: word,
+                                      onDismissed: (direction) async {
+                                        if (direction == DismissDirection.endToStart) {
+                                          await dataManager.deleteWordFromDeck(widget.deckName, word);
+                                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("'${word.word}' 단어가 삭제되었습니다.")));
+                                          _refreshWords();
+                                        } else if (direction == DismissDirection.startToEnd) {
+                                          await Navigator.push(
+                                            context,
+                                            MaterialPageRoute(builder: (context) => WordFormScreen(deckName: widget.deckName, wordToEdit: word)),
+                                          );
+                                          _refreshWords(); // 수정 완료 후 목록 갱신
+                                        }
+                                      },
+                                      child: Card(
+                                        child: ListTile(
+                                          title: Text(word.word),
+                                          subtitle: Text(word.meaning.join(', ')),
+                                          onTap: () async {
+                                            await Navigator.push(
+                                              context,
+                                              MaterialPageRoute(builder: (context) => WordFormScreen(deckName: widget.deckName, wordToEdit: word)),
+                                            );
+                                            _refreshWords(); // 탭으로 수정 완료 후 목록 갱신
+                                          },
                                         ),
                                       ),
-                                    );
-                                    _refreshWords();
-                                  }
-                                },
-                                
-                                child: Card(
-                                  child: ListTile(
-                                    title: Text(word.word),
-                                    subtitle: Text(word.meaning.join(', ')),
-                                    onTap: () async {
-                                      // 탭했을 때도 수정 화면으로 이동
-                                      final result = await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => WordFormScreen(
-                                            deckName: widget.deckName,
-                                            wordToEdit: word,
-                                          ),
-                                        ),
-                                      );
-                                      if (result == true) {
-                                        _refreshWords();
-                                      }
-                                    },
+                                    ),
                                   ),
                                 ),
-                              );                                                             
+                              );
                             },
                           ),
-                  ),
-                ],
-              ),
+                        ),
             ),
-    floatingActionButton: AnimatedOpacity(
+          ],
+        ),
+      ),
+      floatingActionButton: AnimatedOpacity(
         opacity: _showFab ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 300), // 애니메이션 지속 시간
+        duration: const Duration(milliseconds: 300),
         child: Visibility(
-          visible: _showFab, // 실제 위젯의 가시성을 제어 (숨겨질 때 터치 이벤트 방지)
-          child: FloatingActionButton.extended(
+          visible: _showFab,
+          child: FloatingActionButton(
             onPressed: () async {
-              final result = await Navigator.push(
+              await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => WordFormScreen(deckName: widget.deckName)),
               );
-              if (result == true) {
-                _refreshWords();
-              }
+              _refreshWords(); // 단어 추가 완료 후 목록 갱신
             },
-            label: const Text('단어 추가'),
-            icon: const Icon(Icons.add),
+            child: const Icon(Icons.add),
           ),
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

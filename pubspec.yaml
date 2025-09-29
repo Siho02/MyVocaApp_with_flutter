@@ -39,6 +39,8 @@ dependencies:
   flutter_heatmap_calendar: ^1.0.5
   file_picker: ^8.0.5
   csv : ^5.1.1
+  flutter_staggered_animations: ^1.1.1
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:
