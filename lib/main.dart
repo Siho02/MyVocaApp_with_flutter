@@ -199,7 +199,6 @@ class _DeckSelectionScreenState extends State<DeckSelectionScreen> {
         }
       }
     } catch (e) {
-      print("백업 중 예외 발생: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('백업 중 오류 발생: ${e.toString()}')),
@@ -239,7 +238,6 @@ class _DeckSelectionScreenState extends State<DeckSelectionScreen> {
         }
       }
     } catch (e) {
-      print("복원 중 예외 발생: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('복원 중 오류 발생: ${e.toString()}')),

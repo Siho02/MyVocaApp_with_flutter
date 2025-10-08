@@ -7,6 +7,8 @@ import 'package:voca_app/word_form_screen.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:shimmer/shimmer.dart'; 
+import 'package:flutter/scheduler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class WordListScreen extends StatefulWidget {
   final String deckName;
@@ -30,7 +32,6 @@ class _WordListScreenState extends State<WordListScreen> {
   @override
   void initState() {
     super.initState();
-    print("--- [WordListScreen] initState 시작 ---"); // 디버깅용
     try {
       _searchController.addListener(_filterWords);
       _loadWords();
@@ -41,24 +42,18 @@ class _WordListScreenState extends State<WordListScreen> {
           if (!_showFab) setState(() => _showFab = true);
         }
       });
-      print("--- [WordListScreen] initState 완료 ---"); // 디버깅용
     } catch (e) {
-      print("!!!!!! [WordListScreen] initState 중 심각한 오류 발생 !!!!!!"); // 디버깅용
-      print(e); // 오류 상세 출력
       setState(() {
         _isLoading = false; // 오류 발생 시 로딩 중지
       });
+      _showIntroductoryTip();
     }
   }
-
   
   Future<void> _loadWords() async {
-    print("--- [WordListScreen] 데이터 로딩 시작 ---");
-    print("--- [WordListScreen] 덱 이름 확인: '${widget.deckName}' ---");
 
     try {
       final words = await dataManager.getWordsForDeck(widget.deckName);
-      print("--- [WordListScreen] 데이터 로딩 완료, ${words.length}개 단어 받음 ---");
       
       if (mounted) {
         setState(() {
@@ -66,11 +61,8 @@ class _WordListScreenState extends State<WordListScreen> {
           _filteredWords = words;
           _isLoading = false;
         });
-        print("--- [WordListScreen] setState 호출 완료, 화면 갱신 예정 ---");
       }
     } catch (e) {
-      print("!!!!!! [WordListScreen] 데이터 로딩 중 심각한 오류 발생 !!!!!!");
-      print(e);
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -89,7 +81,35 @@ class _WordListScreenState extends State<WordListScreen> {
       }).toList();
     });
   }
-  
+
+  // --- 스와이프 팁 스낵바를 보여주는 재사용 가능한 함수 ---
+  void _showSwipeTipSnackBar() {
+    // 혹시 떠 있는 스낵바가 있다면 먼저 제거
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    // 새로운 스낵바를 보여줌
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('💡 Tip: 단어를 옆으로 밀어서 수정하거나 삭제할 수 있습니다.'),
+        duration: Duration(seconds: 5),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _showIntroductoryTip() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool hasShown = prefs.getBool('hasShownSwipeTip') ?? false;
+
+    if (!hasShown) {
+      // 위젯 빌드가 완료된 후에 _showSwipeTipSnackBar 함수를 호출하도록 예약
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        _showSwipeTipSnackBar();
+      });
+      
+      await prefs.setBool('hasShownSwipeTip', true);
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -137,6 +157,13 @@ class _WordListScreenState extends State<WordListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.deckName}: 단어 목록'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: '도움말 보기', // 아이콘을 길게 눌렀을 때 나오는 설명
+            onPressed: _showSwipeTipSnackBar, // 버튼을 누르면 팁 메시지 함수 호출
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(8.0),

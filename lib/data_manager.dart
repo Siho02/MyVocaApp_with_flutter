@@ -54,7 +54,6 @@ class DataManager {
     if (!allData['decks'].containsKey(deckName)) {
       allData['decks'][deckName] = {'words': []};
       await writeData(allData);
-      print("새 덱 생성 완료: $deckName");
     }
   }
 
@@ -63,7 +62,6 @@ class DataManager {
     final allData = await readData();
     allData['decks'].remove(deckName);
     await writeData(allData);
-    print("덱 삭제 완료: $deckName");
   }
 
   // 덱에 단어 추가
@@ -86,7 +84,6 @@ class DataManager {
     deck['words'].add(newWord);
     allData['decks'][deckName] = deck;
     await writeData(allData);
-    print("단어 저장 완료 (복습 정보 포함): $newWord");
   }
   
   // CSV파일로 덱에 단어 추가 
@@ -127,24 +124,19 @@ class DataManager {
       return addedCount;
 
     } catch (e) {
-      print("CSV 처리 중 오류 발생: $e");
       return 0;
     }
   }
 
   // 덱에 저장된 단어 조회
   Future<List<Word>> getWordsForDeck(String deckName) async {
-    print("--- [DataManager] '${deckName}' 덱의 단어 로딩 시작 ---");
     final allData = await readData();
     final deck = allData['decks'][deckName];
 
     if (deck != null && deck['words'] != null) {
       final wordList = deck['words'] as List;
-      print("--- [DataManager] ${wordList.length}개의 단어 발견, 변환 시작 ---");
       return wordList.map((wordJson) => Word.fromJson(wordJson)).toList();
-      print("--- [DataManager] 단어 변환 완료 ---");
     } else {
-      print("--- [DataManager] 덱 또는 단어 목록이 존재하지 않음 ---");
       return [];
     }
     return [];
@@ -163,7 +155,6 @@ class DataManager {
       wordList.removeWhere((wordJson) => wordJson['createdAt'] == wordToDelete.createdAt);
       
       await writeData(allData);
-      print("단어 삭제 완료: ${wordToDelete.word}");
     }
   }
   
@@ -180,7 +171,6 @@ class DataManager {
         updatedWordData['review_stats'] = oldWord.reviewStats;
         wordList[index] = updatedWordData;
         await writeData(allData);
-        print("단어 수정 완료: ${updatedWordData['word']}");
       }
     }
   }
@@ -196,7 +186,6 @@ class DataManager {
         // 기존 단어 데이터를 찾아서 review_stats 부분만 교체
         wordList[index]['review_stats'] = word.reviewStats;
         await writeData(allData);
-        print("복습 정보 업데이트 완료: ${word.word}");
       }
     }
   }
@@ -223,7 +212,6 @@ class DataManager {
     deck['study_log'][today]['incorrect_count'] += incorrectAnswers;
 
     await writeData(allData);
-    print("학습 로그 기록 완료: $today");
   }
 
   // 특정 덱의 학습로그 가져오기 
@@ -239,15 +227,12 @@ class DataManager {
     try {
       final sourceFile = await _localFile; // 현재 앱 데이터 파일
       if (!await sourceFile.exists()) {
-        print("백업할 데이터 파일이 존재하지 않습니다.");
         return false;
       }
       final destinationFile = File(destinationPath);
       await sourceFile.copy(destinationFile.path); // 파일을 복사하여 백업
-      print("데이터 백업 완료: ${destinationFile.path}");
       return true;
     } catch (e) {
-      print("데이터 백업 중 오류 발생: $e");
       return false;
     }
   }
@@ -257,15 +242,12 @@ class DataManager {
     try {
       final sourceFile = File(sourcePath); // 복원할 백업 파일
       if (!await sourceFile.exists()) {
-        print("복원할 백업 파일이 존재하지 않습니다.");
         return false;
       }
       final destinationFile = await _localFile; // 현재 앱 데이터 파일 경로
       await sourceFile.copy(destinationFile.path); // 백업 파일을 현재 앱 데이터 파일로 복사
-      print("데이터 복원 완료: ${destinationFile.path}");
       return true;
     } catch (e) {
-      print("데이터 복원 중 오류 발생: $e");
       return false;
     }
   }
@@ -306,6 +288,5 @@ class DataManager {
     }
     allData['settings']['themeMode'] = themeModeString;
     await writeData(allData);
-    print("앱 테마 설정 저장 완료: $themeModeString");
   }
 }

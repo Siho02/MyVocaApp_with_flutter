@@ -67,7 +67,6 @@ class HomeScreen extends StatelessWidget {
                   }
                 } else {
                   // 사용자가 파일 선택을 취소한 경우
-                  print('파일 선택이 취소되었습니다.');
                 }
 
               },
